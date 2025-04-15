@@ -8,8 +8,9 @@ import { VerifyEmail } from "../Models/VerifyEmail.model.js";
 
 // import { sendEmail } from "../Libs/nodemailer.js";
 import { sendEmail } from "../Libs/resend.js";
-import { createVerifyEmailLink, findVerificationEmailToken, generateVerificationToken, verifyUserEmailAndUpdate } from "../Services/auth.service.js";
+import { comparePassword, createVerifyEmailLink, findVerificationEmailToken, generateVerificationToken, toHashPassword, verifyUserEmailAndUpdate } from "../Services/auth.service.js";
 import mjml2html from "mjml";
+import { password } from "bun";
 export const signup = async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -20,7 +21,7 @@ export const signup = async (req, res) => {
         if (isUserExist) {
             return res.status(400).json({ error: "User already exist" });
         }
-        const hashedPassword = await bcrypt.hash(password, 12);
+        const hashedPassword = await toHashPassword(password,12)
         const user = await User.create({
             name,
             email,
@@ -46,7 +47,7 @@ export const login = async (req, res) => {
         if (!user) {
             return res.status(400).json({ error: "User not found" });
         }
-        const isPasswordMatch = await bcrypt.compare(password, user.password);
+        const isPasswordMatch =await comparePassword(password, user.password);
         if (!isPasswordMatch) {
             return res.status(400).json({ error: "Invalid credentials" });
         }
@@ -137,4 +138,38 @@ export const verifyEmailToken = async (req, res) => {
     await verifyUserEmailAndUpdate(tokenOtp)
     return res.redirect("/api/home");
 
+}
+
+// ! Change password functionality
+
+export const toChangePassword = async (req,res) => {
+    const {currentPassword,newPassword,confirmPassword} = req.body;
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        req.flash("errors","All fields are required");
+        return res.redirect("/api/change-password");
+    }
+    if (newPassword !== confirmPassword) {
+        req.flash("errors","New password and confirm password does not match");
+        return res.redirect("/api/change-password");
+    }
+    const userId = req.user._id.toString()
+    const user = await User.findOne({_id:userId});
+    if (!user) {
+        req.flash("errors","User not found")
+        return res.redirect("/api/change-password")
+    }
+
+    const isPasswordMatch = await comparePassword(currentPassword,user.password);
+    if (!isPasswordMatch) {
+        req.flash("errors","Current password does not match")
+        return res.redirect("/api/change-password")
+    }
+    const newHashedPassword =await toHashPassword(newPassword,12);
+    await User.updateOne(
+        {_id:userId},
+        {$set:{password:newHashedPassword}}
+    );
+    req.flash("success_msg","Password Updated Successfully");
+    return res.redirect("/api/home");
+    
 }

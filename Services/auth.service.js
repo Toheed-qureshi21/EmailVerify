@@ -1,7 +1,16 @@
 import { User } from "../Models/User.model.js";
 import { VerifyEmail } from "../Models/VerifyEmail.model.js";
+import bcrypt from "bcryptjs"
 import crypto from "crypto"
 
+export const toHashPassword =async(password,salt) => {
+   const hashedPassword = await bcrypt.hash(password,salt);
+   return hashedPassword;
+}
+export const comparePassword = async(password,realPassword)=>{
+    const isCompared = await bcrypt.compare(password,realPassword);
+    return isCompared;
+}
 export const generateVerificationToken = (digit = 8) => {
     const min = 10 ** (digit - 1);
     const max = (10 ** digit) - 1;

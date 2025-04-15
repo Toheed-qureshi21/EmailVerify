@@ -4,36 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home</title>
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <h1>Hello this is a home page</h1>
     <hr/>
+    <button><a href="/api/change-password">Change Password</a></button>
     <button><a href="/api/verify-email">Verify Email</a></button>
     <form action="/api/logout" method="post" id="logout">
         <button type="submit">Logout</button>
     </form>
-    <!-- <script>
-        const logout = document.getElementById("logout");
-        logout.addEventListener("submit", async (e) => {
-            e.preventDefault(); // Prevents the form from submitting the default way
-            try {
-                const res = await fetch("http://localhost:3000/api/logout", {
-                    method: "POST",
-                    credentials: "include" // Include cookies if needed
-                });
-    
-                if (res.ok) {
-                    // Redirect after successful logout
-                    window.location.reload();
-                    window.location.href = "http://localhost:3000/api/login";
-                } else {
-                    console.error("Logout failed");
-                }
-            } catch (err) {
-                console.error("Error during logout:", err);
-            }
-        });
-    </script> -->
+    <% if ((success_msg && success_msg.length > 0)) { %>
+        <div class="error-container">
+          <p class="flash-error"><%= success_msg %></p>
+        </div>
+        <% } %>
     
 </body>
 </html>
