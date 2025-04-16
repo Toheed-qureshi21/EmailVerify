@@ -79,3 +79,38 @@ EJS – dynamic email content rendering
 MJML – responsive email design
 
 Resend – email sending service
+
+🔑 Password Reset Flow
+1. Request Password Reset
+Route: /api/request-password-reset
+
+User submits their email
+
+If email is valid and verified, generates a secure token
+
+Stores token and expiry in a ResetToken collection
+
+Sends a password reset link via email:
+
+perl
+Copy
+Edit
+http://localhost:3000/api/reset-password?email=user@example.com&token=12345678
+Email template: emails/reset-password.mjml
+
+mjml
+Copy
+Edit
+<a href="<%= link %>">Reset your password</a>
+2. Reset Password Page
+Route: /api/reset-password?email=...&token=...
+
+Validates token and expiration (typically 1 hour)
+
+Displays password reset form
+
+On submit, hashes new password and updates user record
+
+Deletes used token
+
+Redirects to /api/login or /api/home
