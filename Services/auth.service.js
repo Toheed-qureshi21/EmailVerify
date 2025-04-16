@@ -1,3 +1,4 @@
+import { ForgotPassword } from "../Models/ForgotPassword.model.js";
 import { User } from "../Models/User.model.js";
 import { VerifyEmail } from "../Models/VerifyEmail.model.js";
 import bcrypt from "bcryptjs"
@@ -51,4 +52,34 @@ export const verifyUserEmailAndUpdate = async ({ email, userId }) => {
     await VerifyEmail.deleteMany({userId});
     return user;
 }
-// clearVerifyEmailTokens
+
+
+// ! Forgot password implementation
+
+export const createResetPasswordLink = async ({userId}) => {
+    const randomToken = crypto.randomBytes(32).toString("hex");
+    const token_hash = crypto.createHash("sha256").update(randomToken).digest("hex");  // 64 characters
+    await ForgotPassword.deleteMany({userId});
+    await ForgotPassword.insertOne({
+        userId,
+        token_hash,
+        createdAt: new Date(),
+    });
+
+    return `http://localhost:3000/api/reset-password/${randomToken}`;
+}
+
+export const getResetPasswordData = async(token) => {
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    const data = await ForgotPassword.findOne({token_hash:tokenHash});
+    return data;
+}
+
+export const updatePassword = async(userId,newPassword,salt=12) => {
+    const newHashedPassword = await toHashPassword(newPassword,salt);
+    await User.updateOne(
+        { _id: userId },
+        { $set: { password: newHashedPassword } }
+    );
+}

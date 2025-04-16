@@ -23,7 +23,7 @@ export const isAuthenticate = async(req, res, next) => {
 export const checkIfUserLoggedIn = (req,res,next) => {
     const isLoggedIn= req?.cookies?.isLoggedIn;
     if (isLoggedIn) {
-     res.redirect("/api/home")
+    return  res.redirect("/api/home")
     }
     next();
 }
