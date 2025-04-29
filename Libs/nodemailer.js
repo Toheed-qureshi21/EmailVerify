@@ -42,7 +42,7 @@ export const sendEmail = async ({ to, subject, html }) => {
 
   try {
     const info = await transporter.sendMail({
-      from: `"Toheed developer" <qureshirameez140@gmail.com>`,
+      from: `"Toheed developer" <${process.env.BREVO_SMTP_EMAIL}>`,
       to,
       subject,
       html,
