@@ -6,8 +6,8 @@ import { User } from "../Models/User.model.js"
 import { generateToken } from "../Utils/generateToken.js";
 import { VerifyEmail } from "../Models/VerifyEmail.model.js";
 
-// import { sendEmail } from "../Libs/nodemailer.js";
-import { sendEmail } from "../Libs/resend.js";
+import { sendEmail } from "../Libs/nodemailer.js";
+// import { sendEmail } from "../Libs/resend.js";
 import { comparePassword, createResetPasswordLink, createVerifyEmailLink, findVerificationEmailToken, generateVerificationToken, getResetPasswordData, toHashPassword, updatePassword, verifyUserEmailAndUpdate } from "../Services/auth.service.js";
 import mjml2html from "mjml";
 
