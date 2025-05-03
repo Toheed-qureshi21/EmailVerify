@@ -13,7 +13,12 @@ const app = express();
 app.use(session({
     secret:process.env.SESSIOIN_SECRET_KEY,
     resave:false,
-    saveUninitialized:true
+    saveUninitialized:true,
+    cookie: {
+        httpOnly: true,
+        secure: false, // Set to true if you're using HTTPS
+        maxAge: 1000 * 60 * 60, // 1 hour
+      },
 }));
 app.set("view engine","ejs");
 

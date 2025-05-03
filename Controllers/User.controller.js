@@ -13,6 +13,9 @@ import mjml2html from "mjml";
 
 import session from "express-session";
 import { ForgotPassword } from "../Models/ForgotPassword.model.js";
+import { decodeIdToken, generateCodeVerifier, generateState } from "arctic";
+import { google } from "../Libs/OAuth/google.js";
+import { OAuthAccount } from "../Models/OAuthAcconts.model.js";
 export const signup = async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -42,12 +45,17 @@ export const signup = async (req, res) => {
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
-        if (!email || !password) {
+        if (!email ) {
             return res.status(400).json({ error: "All fields are required" });
         }
+        
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(400).json({ error: "User not found" });
+        }
+        if (!user.password) {
+            req.flash("errors", "You have created account with social login . Please log in with social account");
+            return res.redirect("/api/login");
         }
         const isPasswordMatch = await comparePassword(password, user.password);
         if (!isPasswordMatch) {
@@ -55,7 +63,7 @@ export const login = async (req, res) => {
         }
         generateToken(res, user._id);
         res.redirect("/api/home");
-        return res.status(200).json({ message: "Login successful" });
+
     } catch (error) {
         console.log(error);
         return res.status(500).json({ error: "Internal server error" });
@@ -64,15 +72,43 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
     try {
-        res.clearCookie("token");
-        res.clearCookie("isLoggedIn");
-        session.destroy()
-        return res.redirect("/api/login");
+        const userId = req.user._id;
+
+        // Check if user logged in with Google
+        const googleOAuthAccount = await OAuthAccount.findOne({
+            userId: userId,
+            provider: "google",
+        });
+
+        // Remove OAuth record if you want to unlink (optional)
+        if (googleOAuthAccount) {
+            await OAuthAccount.deleteOne({ _id: googleOAuthAccount._id });
+        }
+
+        // Clear cookies
+        res.clearCookie("token", { path: "/" });
+        res.clearCookie("isLoggedIn", { path: "/" });
+        res.clearCookie("google_oauth_code_verifier", { path: "/" });
+        res.clearCookie("google_oauth_state", { path: "/" });
+
+        // Destroy session
+        req.session?.destroy?.();
+
+        // Conditionally redirect
+        if (googleOAuthAccount) {
+            // Google user: redirect to frontend route that handles Google logout
+            return res.redirect("https://accounts.google.com/Logout")
+        } else {
+            // Normal user: redirect directly to login
+            return res.redirect("/api/login");
+        }
     } catch (error) {
+        console.error("Logout error:", error);
         return res.status(500).json({ error: "Internal server error" });
     }
+};
 
-}
+
 
 export const resendVerificationLink = async (req, res) => {
     try {
@@ -233,6 +269,8 @@ export const getPasswordPage = async(req,res) => {
 }
 
 export const postResetPassword =async (req,res) => {
+
+
     const {newPassword,confirmPassword} = req.body;
     if (!newPassword || !confirmPassword || newPassword!==confirmPassword) {
         req.flash("errors","Both password fields are required")
@@ -245,3 +283,142 @@ export const postResetPassword =async (req,res) => {
     await updatePassword(userId,newPassword,12);
     return res.redirect("/api/login");
 }   
+
+export const getGooglePage = async (req,res) => {
+
+    // To create authorization url
+    const state = generateState();
+    const codeVerifier = generateCodeVerifier();
+    const scopes = ["openid", "profile","email"]
+    const url = google.createAuthorizationURL(state,codeVerifier,scopes,{
+        prompt: "consent select_account",
+        access_type: "offline",
+        include_granted_scopes: false,
+    });
+    const cookieConfig = {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        maxAge:100*60*60*1000,
+    }
+    res.cookie("google_oauth_state",state,cookieConfig)
+    res.cookie("google_oauth_code_verifier",codeVerifier,cookieConfig)
+    console.log("Generated URL: ", url.toString());
+
+    return res.redirect(url.toString());
+}
+
+// export const getGoogleCallback = async(req,res)=>{
+//     const {state,code} = req.query;
+//     const {google_oauth_state:storedStateInCookie,google_oauth_code_verifier:storedCodeVerifier} = req.cookies;
+//     if(!state||!code||!storedStateInCookie||!storedCodeVerifier||state!==storedStateInCookie){
+//         req.flash("errors","Invalid state");
+//         return res.redirect("/api/login");
+//     }
+//     let tokens;
+//     try {
+//         tokens = await google.validateAuthorizationCode(code,storedCodeVerifier);
+//         const claims = decodeIdToken(tokens.idToken());
+//         console.log('State from request:', state);
+// console.log('Stored state in cookie:', storedStateInCookie);
+// console.log('Decoded token:', claims);
+
+//         const {sub:googleUserId,email,name} = claims;
+//         console.log("GOOGLE USER ID ",`${googleUserId}`);
+        
+
+//         // Condition --> 1 If user already exist with gooogle's oauth linked account
+//         let oauthAccount = await OAuthAccount.findOne({
+//             provider: "google",
+//             providerAccountId: googleUserId // or google profile id from OAuth
+//           });
+//           console.log(oauthAccount);
+//           if (!oauthAccount) {
+//             // req.flash("errors","No account found");
+//             // return res.redirect("/api/login");
+//         }
+//         let user = await User.findById(oauthAccount.userId).select("-password");
+          
+
+//         // Condition --> 2 If user already exist with same email but google ouath is not linked to that account
+//         if(user && !user.providerAccountId){
+//             await OAuthAccount.create({userId:user._id,provider:"google",providerAccountId:googleUserId});
+//             console.log("Linked Google account to user:", user);
+//         }
+//         // Condition --> 3 If user does not exist
+//         if (!user) {
+//             user = await User.create({name,email,isEmail_Verified:true});
+//             await OAuthAccount.create({userId:user._id,provider:"google",providerAccountId:googleUserId});
+//         }
+//         generateToken(res,user._id);
+//         return res.redirect("/api/home");
+//     } catch (error) {
+//         console.log(error);
+//         req.flash("errors",error)
+//         return res.redirect("/api/login");
+        
+//     }
+// }
+export const getGoogleCallback = async (req, res) => {
+    const { state, code } = req.query;
+    const { google_oauth_state: storedStateInCookie, google_oauth_code_verifier: storedCodeVerifier } = req.cookies;
+    
+    // Validate the state and code
+    if (!state || !code || !storedStateInCookie || !storedCodeVerifier || state !== storedStateInCookie) {
+        req.flash("errors", "Invalid state");
+        return res.redirect("/api/login");
+    }
+
+    let tokens;
+    try {
+        // Validate the authorization code
+        tokens = await google.validateAuthorizationCode(code, storedCodeVerifier);
+        const claims = decodeIdToken(tokens.idToken());
+        
+
+        const { sub: googleUserId, email, name } = claims;
+
+        // 1. Check if OAuthAccount exists for the Google user
+        let oauthAccount = await OAuthAccount.findOne({
+            provider: "google",
+            providerAccountId: googleUserId
+        });
+        let user;
+
+        // 2. If OAuthAccount does not exist, create a new one
+        if (!oauthAccount) {
+            // Check if a user already exists with this email
+             user = await User.findOne({ email }).select("-password");
+
+            if (!user) {
+                // If no user exists with this email, create a new user
+                user = await User.create({ name, email, isEmail_Verified: true });
+            }
+
+            // Create a new OAuthAccount and link it to the user
+            oauthAccount = await OAuthAccount.create({
+                userId: user._id,
+                provider: "google",
+                providerAccountId: googleUserId
+            });
+
+            console.log("Created new OAuthAccount and linked to user:", user);
+        } else {
+            // If OAuthAccount exists, retrieve the linked user
+            let user = await User.findById(oauthAccount.userId).select("-password");
+            console.log("User already linked to OAuth account:", user);
+        }
+
+        // Generate the token and redirect the user to the home page
+        generateToken(res, oauthAccount.userId);
+        res.clearCookie("google_oauth_state");
+        res.clearCookie("google_oauth_code_verifier");
+
+        return res.redirect("/api/home");
+    } catch (error) {
+        console.log(error);
+        req.flash("errors", error);
+        return res.redirect("/api/login");
+    }
+};
+

@@ -1,5 +1,5 @@
 import express from "express"
-import { forgotPasswordController, getPasswordPage, login, logout, postResetPassword, resendVerificationLink, signup, toChangePassword, verifyEmailToken } from "../Controllers/User.controller.js";
+import { forgotPasswordController, getGoogleCallback, getGooglePage, getPasswordPage, login, logout, postResetPassword, resendVerificationLink, signup, toChangePassword, verifyEmailToken } from "../Controllers/User.controller.js";
 import { checkIfUserLoggedIn, isAuthenticate } from "../Middlewares/auth.js";
 
 const router = express.Router()
@@ -37,7 +37,7 @@ router.get("/change-password", isAuthenticate, (req, res) => {
 router.post("/login", login)
 router.post("/signup", signup);
 router.post("/resend-verification-link", isAuthenticate, resendVerificationLink)
-router.post("/logout", isAuthenticate, logout)
+router.post("/logout",isAuthenticate,logout)
 router.get("/verify-email-link", verifyEmailToken)
 
 router.post("/change-password", isAuthenticate, toChangePassword)
@@ -56,5 +56,8 @@ router.route("/reset-password").post(forgotPasswordController);
 router.get("/reset-password/:token",getPasswordPage)
 
 router.post("/reset-password/:token",postResetPassword)
+// Oauth with google
+router.get("/google",getGooglePage)
+router.get("/google/callback",getGoogleCallback)
 
 export default router;
